@@ -28,30 +28,40 @@ high_vol_favorites = ["TSLA", "SPCX", "AMD", "NVDA", "COIN", "MSTR", "MARA", "RI
 # --- 1. STOCK SELECTION ---
 st.subheader("1. Select Stocks")
 
-mode = st.radio("Mode:", ["🔥 High-Volatility Favorites", "🔍 Full S&P 500 Search"], horizontal=True)
+mode = st.radio("Mode:", ["🔥 High-Volatility Favorites", "🔍 S&P 500 Universe"], horizontal=True)
 
 selected_tickers = []
 
 if "Favorites" in mode:
+    select_all_favs = st.checkbox("Select All Favorites", value=False)
     st.caption("Tick the stocks you want to scan:")
     cols = st.columns(3)
     defaults = ["TSLA", "SPCX", "QQQ", "NVDA"]
     for i, ticker in enumerate(high_vol_favorites):
         with cols[i % 3]:
-            if st.checkbox(ticker, value=(ticker in defaults), key=f"fav_{ticker}"):
+            is_checked = True if select_all_favs else (ticker in defaults)
+            if st.checkbox(ticker, value=is_checked, key=f"fav_{ticker}"):
                 selected_tickers.append(ticker)
 else:
     tickers_list = get_sp500_tickers()
-    selected_tickers = st.multiselect("Search S&P 500 Stocks:", tickers_list, default=["AAPL"])
+    
+    select_all_sp500 = st.checkbox("S&P500", value=False)
+    
+    if select_all_sp500:
+        selected_tickers = tickers_list
+        st.info(f"Loaded all {len(tickers_list)} S&P 500 tickers for scanning.")
+    else:
+        selected_tickers = st.multiselect("Search / Select Specific S&P 500 Stocks:", tickers_list, default=["AAPL", "MSFT", "GOOGL"])
 
 if not selected_tickers:
-    st.warning("Please tick at least one stock to scan.")
+    st.warning("Please tick or select at least one stock to scan.")
     st.stop()
 
 @st.cache_data(ttl=3600)
 def get_common_expirations(tickers):
     all_exps = set()
-    for t in tickers:
+    sample_tickers = tickers[:10] if len(tickers) > 20 else tickers
+    for t in sample_tickers:
         tkr = yf.Ticker(t, session=session)
         all_exps.update(tkr.options)
     return sorted(list(all_exps))
@@ -67,7 +77,6 @@ if not exp_dates:
 st.subheader("2. Expiration Dates")
 
 st.caption("Auto-select expirations up to:")
-# Replaced single checkbox with a horizontal row of options
 auto_screen = st.radio(
     "Auto-Screen Window:", 
     ["4 Weeks", "5 Weeks", "6 Weeks", "7 Weeks", "8 Weeks", "Manual Selection"], 
@@ -77,10 +86,8 @@ auto_screen = st.radio(
 )
 
 if auto_screen != "Manual Selection":
-    # Extract the number of weeks from the selected option (e.g., "5 Weeks" -> 5)
     weeks_out = int(auto_screen.split(" ")[0])
     target_date = datetime.now() + timedelta(weeks=weeks_out)
-    
     selected_exps = [d for d in exp_dates if datetime.strptime(d, '%Y-%m-%d') <= target_date]
     st.success(f"Auto-selected {len(selected_exps)} expiration dates within the next {weeks_out} weeks.")
 else:
@@ -103,7 +110,12 @@ with f_col3:
 @st.cache_data(ttl=900)
 def load_options_data(tickers, exp_dates_list):
     calls_list = []
-    for t in tickers:
+    progress_bar = st.progress(0) if len(tickers) > 20 else None
+    
+    for idx, t in enumerate(tickers):
+        if progress_bar:
+            progress_bar.progress((idx + 1) / len(tickers))
+            
         tkr = yf.Ticker(t, session=session)
         try:
             current_price = tkr.history(period="1d")['Close'].iloc[-1]
@@ -121,9 +133,12 @@ def load_options_data(tickers, exp_dates_list):
                 except Exception:
                     pass
                     
+    if progress_bar:
+        progress_bar.empty()
+        
     return pd.concat(calls_list, ignore_index=True) if calls_list else pd.DataFrame()
 
-with st.spinner(f"Loading options chains for {len(selected_exps)} dates..."):
+with st.spinner(f"Loading options chains for {len(selected_tickers)} ticker(s) across {len(selected_exps)} expiration date(s)..."):
     df_calls = load_options_data(selected_tickers, selected_exps)
 
 if df_calls.empty:
@@ -143,7 +158,7 @@ filtered_df = df_calls[
     (df_calls['Strike/Stock Ratio (%)'] >= min_strike_ratio)
 ].copy()
 
-# Sorts strictly by Premium Yield in descending order
+# Sort by Premium Yield descending
 filtered_df = filtered_df.sort_values(by=['Premium Yield (%)', 'Expiration'], ascending=[False, True])
 
 cols_to_display = [
