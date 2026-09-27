@@ -105,7 +105,8 @@ with f_col1:
 with f_col2:
     min_yield_pct = st.number_input("Min Premium Yield (%)", min_value=0.0, value=1.0, step=0.1)
 with f_col3:
-    min_strike_ratio = st.number_input("Min Strike vs Stock (%)", value=100.0, step=1.0)
+    # UPDATED: Default value is now 120.0
+    min_strike_ratio = st.number_input("Min Strike vs Stock (%)", value=120.0, step=1.0)
 
 @st.cache_data(ttl=900)
 def load_options_data(tickers, exp_dates_list):
