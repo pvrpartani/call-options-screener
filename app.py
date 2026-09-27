@@ -5,9 +5,9 @@ import requests
 import io
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="S&P 500 Options Calculator", layout="wide")
-st.title("📈 Advanced Call Options Calculator")
-st.write("Filter by specific or all expirations, credit received, premium yields, and strike prices.")
+st.set_page_config(page_title="Options Calculator", layout="wide")
+st.title("📈 Call Options Calculator")
+st.write("Filter call options by credit received, premium yield, and strike price.")
 
 # --- Stealth Session for Yahoo Finance & Wikipedia ---
 session = requests.Session()
@@ -23,22 +23,30 @@ def get_sp500_tickers():
     df = pd.read_html(io.StringIO(response.text))[0]
     return df['Symbol'].str.replace('.', '-', regex=False).tolist()
 
-# Curated High-Volatility & Popular Tickers (Includes SPCX & QQQ)
 high_vol_favorites = ["TSLA", "SPCX", "AMD", "NVDA", "COIN", "MSTR", "MARA", "RIOT", "PLTR", "UPST", "QQQ"]
 
-st.sidebar.header("1. Select Stocks")
+# --- 1. STOCK SELECTION (MAIN PAGE / MOBILE FRIENDLY) ---
+st.subheader("1. Select Stocks")
 
-# Toggle between Favorites and full S&P 500
-use_favorites = st.sidebar.checkbox("🔥 Use High-Volatility Favorites", value=True, help="Switch between curated high-premium stocks and the entire S&P 500.")
+mode = st.radio("Mode:", ["🔥 High-Volatility Favorites", "🔍 Full S&P 500 Search"], horizontal=True)
 
-if use_favorites:
-    selected_tickers = st.sidebar.multiselect("Favorites:", high_vol_favorites, default=["TSLA", "SPCX", "QQQ", "NVDA"])
+selected_tickers = []
+
+if "Favorites" in mode:
+    st.caption("Tick the stocks you want to scan:")
+    # Render checkboxes in a 3-column grid that scales cleanly on mobile screens
+    cols = st.columns(3)
+    defaults = ["TSLA", "SPCX", "QQQ", "NVDA"]
+    for i, ticker in enumerate(high_vol_favorites):
+        with cols[i % 3]:
+            if st.checkbox(ticker, value=(ticker in defaults), key=f"fav_{ticker}"):
+                selected_tickers.append(ticker)
 else:
     tickers_list = get_sp500_tickers()
-    selected_tickers = st.sidebar.multiselect("Choose S&P 500 Stocks:", tickers_list, default=["AAPL"])
+    selected_tickers = st.multiselect("Search S&P 500 Stocks:", tickers_list, default=["AAPL"])
 
 if not selected_tickers:
-    st.warning("Please select at least one stock.")
+    st.warning("Please tick at least one stock to scan.")
     st.stop()
 
 @st.cache_data(ttl=3600)
@@ -56,29 +64,30 @@ if not exp_dates:
     st.error("No options data available for the selected stocks.")
     st.stop()
 
-st.sidebar.header("2. Expiration Dates")
-# Auto-Screen Toggle for 4 Weeks
-auto_4_weeks = st.sidebar.checkbox("🚀 Auto-Screen Next 4 Weeks", value=False)
+# --- 2. EXPIRATIONS ---
+st.subheader("2. Expiration Dates")
+auto_4_weeks = st.checkbox("🚀 Auto-Screen Next 4 Weeks", value=True)
 
 if auto_4_weeks:
     four_weeks_from_now = datetime.now() + timedelta(weeks=4)
     selected_exps = [d for d in exp_dates if datetime.strptime(d, '%Y-%m-%d') <= four_weeks_from_now]
-    st.sidebar.success(f"Auto-selected {len(selected_exps)} expiration dates within 4 weeks.")
+    st.success(f"Auto-selected {len(selected_exps)} expiration dates within the next 4 weeks.")
 else:
-    load_all_exp = st.sidebar.checkbox("Load ALL Expirations (Can be slow)")
-    if load_all_exp:
-        selected_exps = exp_dates
-    else:
-        selected_exps = st.sidebar.multiselect("Select Expirations to Load:", exp_dates, default=exp_dates[:1])
+    selected_exps = st.multiselect("Select Specific Expirations:", exp_dates, default=exp_dates[:1])
 
 if not selected_exps:
     st.warning("Please select at least one expiration date.")
     st.stop()
 
-st.sidebar.header("3. Advanced Filters")
-min_credit = st.sidebar.number_input("Min Credit ($ Premium)", min_value=0.0, value=0.50, step=0.1)
-min_yield_pct = st.sidebar.number_input("Min Premium Yield (%)", min_value=0.0, value=1.0, step=0.1)
-min_strike_ratio = st.sidebar.number_input("Min Strike vs Stock Price (%)", value=100.0, step=1.0)
+# --- 3. FILTER PARAMETERS ---
+st.subheader("3. Filter Parameters")
+f_col1, f_col2, f_col3 = st.columns(3)
+with f_col1:
+    min_credit = st.number_input("Min Credit ($ Premium)", min_value=0.0, value=0.50, step=0.1)
+with f_col2:
+    min_yield_pct = st.number_input("Min Premium Yield (%)", min_value=0.0, value=1.0, step=0.1)
+with f_col3:
+    min_strike_ratio = st.number_input("Min Strike vs Stock (%)", value=100.0, step=1.0)
 
 @st.cache_data(ttl=900)
 def load_options_data(tickers, exp_dates_list):
@@ -131,9 +140,10 @@ cols_to_display = [
     'Strike/Stock Ratio (%)', 'Covered_Call_Breakeven'
 ]
 
+# --- 4. RESULTS TABLE ---
 st.subheader(f"Filtered Results: Found {len(filtered_df)} Contracts")
 if filtered_df.empty:
-    st.info("No contracts matched your filters. Try adjusting them in the sidebar.")
+    st.info("No contracts matched your filters. Try adjusting them above.")
 else:
     st.dataframe(filtered_df[cols_to_display].style.format({
         'Underlying_Price': '${:.2f}',
