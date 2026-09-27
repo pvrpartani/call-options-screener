@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import requests
+import io 
 
 st.set_page_config(page_title="S&P 500 Options Calculator", layout="wide")
 st.title("📈 Advanced S&P 500 Call Options Calculator")
@@ -18,7 +19,7 @@ def get_sp500_tickers():
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     response = requests.get(url, headers=headers)
-    df = pd.read_html(response.text)[0]
+    df = pd.read_html(io.StringIO(response.text))[0]
     return df['Symbol'].str.replace('.', '-', regex=False).tolist()
 
 tickers_list = get_sp500_tickers()
