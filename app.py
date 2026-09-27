@@ -65,12 +65,24 @@ if not exp_dates:
 
 # --- 2. EXPIRATIONS ---
 st.subheader("2. Expiration Dates")
-auto_4_weeks = st.checkbox("🚀 Auto-Screen Next 4 Weeks", value=True)
 
-if auto_4_weeks:
-    four_weeks_from_now = datetime.now() + timedelta(weeks=4)
-    selected_exps = [d for d in exp_dates if datetime.strptime(d, '%Y-%m-%d') <= four_weeks_from_now]
-    st.success(f"Auto-selected {len(selected_exps)} expiration dates within the next 4 weeks.")
+st.caption("Auto-select expirations up to:")
+# Replaced single checkbox with a horizontal row of options
+auto_screen = st.radio(
+    "Auto-Screen Window:", 
+    ["4 Weeks", "5 Weeks", "6 Weeks", "7 Weeks", "8 Weeks", "Manual Selection"], 
+    index=0, 
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
+if auto_screen != "Manual Selection":
+    # Extract the number of weeks from the selected option (e.g., "5 Weeks" -> 5)
+    weeks_out = int(auto_screen.split(" ")[0])
+    target_date = datetime.now() + timedelta(weeks=weeks_out)
+    
+    selected_exps = [d for d in exp_dates if datetime.strptime(d, '%Y-%m-%d') <= target_date]
+    st.success(f"Auto-selected {len(selected_exps)} expiration dates within the next {weeks_out} weeks.")
 else:
     selected_exps = st.multiselect("Select Specific Expirations:", exp_dates, default=exp_dates[:1])
 
@@ -131,9 +143,7 @@ filtered_df = df_calls[
     (df_calls['Strike/Stock Ratio (%)'] >= min_strike_ratio)
 ].copy()
 
-# --- UPDATED SORTING LOGIC ---
-# Sorts strictly by Premium Yield in descending order (highest % at the top).
-# In the event of a tie, it falls back to sorting by expiration date.
+# Sorts strictly by Premium Yield in descending order
 filtered_df = filtered_df.sort_values(by=['Premium Yield (%)', 'Expiration'], ascending=[False, True])
 
 cols_to_display = [
