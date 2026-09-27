@@ -25,7 +25,7 @@ def get_sp500_tickers():
 
 high_vol_favorites = ["TSLA", "SPCX", "AMD", "NVDA", "COIN", "MSTR", "MARA", "RIOT", "PLTR", "UPST", "QQQ"]
 
-# --- 1. STOCK SELECTION (MAIN PAGE / MOBILE FRIENDLY) ---
+# --- 1. STOCK SELECTION ---
 st.subheader("1. Select Stocks")
 
 mode = st.radio("Mode:", ["🔥 High-Volatility Favorites", "🔍 Full S&P 500 Search"], horizontal=True)
@@ -34,7 +34,6 @@ selected_tickers = []
 
 if "Favorites" in mode:
     st.caption("Tick the stocks you want to scan:")
-    # Render checkboxes in a 3-column grid that scales cleanly on mobile screens
     cols = st.columns(3)
     defaults = ["TSLA", "SPCX", "QQQ", "NVDA"]
     for i, ticker in enumerate(high_vol_favorites):
@@ -132,7 +131,10 @@ filtered_df = df_calls[
     (df_calls['Strike/Stock Ratio (%)'] >= min_strike_ratio)
 ].copy()
 
-filtered_df = filtered_df.sort_values(by=['Expiration', 'Ticker', 'strike'])
+# --- UPDATED SORTING LOGIC ---
+# Sorts strictly by Premium Yield in descending order (highest % at the top).
+# In the event of a tie, it falls back to sorting by expiration date.
+filtered_df = filtered_df.sort_values(by=['Premium Yield (%)', 'Expiration'], ascending=[False, True])
 
 cols_to_display = [
     'Expiration', 'Ticker', 'Underlying_Price', 'strike', 'bid', 
