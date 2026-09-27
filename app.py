@@ -28,30 +28,37 @@ high_vol_favorites = ["TSLA", "SPCX", "AMD", "NVDA", "COIN", "MSTR", "MARA", "RI
 # --- 1. STOCK SELECTION ---
 st.subheader("1. Select Stocks")
 
-mode = st.radio("Mode:", ["🔥 High-Volatility Favorites", "🔍 S&P 500 Universe"], horizontal=True)
-
 selected_tickers = []
 
-if "Favorites" in mode:
-    select_all_favs = st.checkbox("Select All Favorites", value=False)
-    st.caption("Tick the stocks you want to scan:")
-    cols = st.columns(3)
-    defaults = ["TSLA", "SPCX", "QQQ", "NVDA"]
-    for i, ticker in enumerate(high_vol_favorites):
-        with cols[i % 3]:
-            is_checked = True if select_all_favs else (ticker in defaults)
-            if st.checkbox(ticker, value=is_checked, key=f"fav_{ticker}"):
+# S&P 500 Master Tickbox
+scan_all_sp500 = st.checkbox("⚡ Scan ALL 500+ S&P 500 Tickers", value=False)
+
+# Favorites Tickboxes
+st.markdown("**🔥 High-Volatility Favorites**")
+select_all_favs = st.checkbox("Select All Favorites", value=False)
+cols = st.columns(3)
+defaults = ["TSLA", "SPCX", "QQQ", "NVDA"]
+
+for i, ticker in enumerate(high_vol_favorites):
+    with cols[i % 3]:
+        is_checked = True if select_all_favs else (ticker in defaults)
+        if st.checkbox(ticker, value=is_checked, key=f"fav_{ticker}"):
+            if ticker not in selected_tickers:
                 selected_tickers.append(ticker)
+
+tickers_list = get_sp500_tickers()
+
+if scan_all_sp500:
+    st.info(f"Loaded all {len(tickers_list)} S&P 500 tickers for scanning.")
+    for t in tickers_list:
+        if t not in selected_tickers:
+            selected_tickers.append(t)
 else:
-    tickers_list = get_sp500_tickers()
-    
-    select_all_sp500 = st.checkbox("S&P500", value=False)
-    
-    if select_all_sp500:
-        selected_tickers = tickers_list
-        st.info(f"Loaded all {len(tickers_list)} S&P 500 tickers for scanning.")
-    else:
-        selected_tickers = st.multiselect("Search / Select Specific S&P 500 Stocks:", tickers_list, default=["AAPL", "MSFT", "GOOGL"])
+    # Manual selection box only appears if "Scan ALL" is unticked
+    manual_sp500 = st.multiselect("Or Search Specific S&P 500 Stocks:", tickers_list, default=[])
+    for t in manual_sp500:
+        if t not in selected_tickers:
+            selected_tickers.append(t)
 
 if not selected_tickers:
     st.warning("Please tick or select at least one stock to scan.")
@@ -105,7 +112,7 @@ with f_col1:
 with f_col2:
     min_yield_pct = st.number_input("Min Premium Yield (%)", min_value=0.0, value=1.0, step=0.1)
 with f_col3:
-    # UPDATED: Default value is now 120.0
+    # Default set to 120.0
     min_strike_ratio = st.number_input("Min Strike vs Stock (%)", value=120.0, step=1.0)
 
 @st.cache_data(ttl=900)
